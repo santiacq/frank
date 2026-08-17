@@ -1,0 +1,10 @@
+[project]
+name = "frank"
+version = "0.1.0"
+description = "Frank: a minimal from-scratch coding agent harness on OpenRouter"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "openrouter>=1.1.57",
+    "python-dotenv>=1.2.3",
+]
