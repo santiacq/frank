@@ -5,6 +5,8 @@ A minimal coding agent harness that runs in your terminal, built on
 commands, and keeps a running tally of tokens and cost — all through a simple
 REPL with a deny-by-default confirmation prompt before every tool call.
 
+![Frank in the terminal](frank.png)
+
 ## Install
 
 ```sh
