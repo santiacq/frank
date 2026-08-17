@@ -41,6 +41,10 @@ class Agent:
         self.confirm = confirm  # callback: (tool_name, args) -> bool
         self.debug = debug
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        self.tokens = 0          # total tokens this session (exact ints)
+        self.cost_umicros = 0    # running cost in integer microdollars (1 USD = 1_000_000)
+        self.cost_unknown = False  # True if any call didn't report a cost
+        self.calls = []          # (total_tokens, cost_usd|None, model) per API call
         if self.debug:
             # The tools payload is identical on every request, so show it once.
             debug_dump("tools sent with every request", tools.SCHEMAS)
@@ -58,6 +62,18 @@ class Agent:
                 messages=self.messages,
                 tools=tools.SCHEMAS,
             )
+
+            usage = result.usage
+            if usage is not None:
+                self.tokens += usage.total_tokens
+                cost = usage.cost
+                self.calls.append((usage.total_tokens, cost, self.model))
+                if cost is None:
+                    self.cost_unknown = True
+                else:
+                    # Accumulate in integer microdollars so tiny floats
+                    # can't accumulate rounding drift.
+                    self.cost_umicros += round(cost * 1_000_000)
 
             if self.debug:
                 debug_dump("response", result)

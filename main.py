@@ -41,7 +41,7 @@ def main():
     client = OpenRouter(api_key=api_key)
     agent = Agent(client, cli_args.model, confirm, debug=cli_args.debug)
 
-    print(f"Frank -- model: {agent.model} -- /model <slug> to switch, /debug to toggle, /quit to exit")
+    print(f"Frank -- model: {agent.model} -- /model <slug> to switch, /debug to toggle, /stats to see session stats, /quit to exit")
 
     while True:
         try:
@@ -57,6 +57,16 @@ def main():
         if user_input == "/debug":
             agent.debug = not agent.debug
             print(f"debug {'on' if agent.debug else 'off'}")
+            continue
+        if user_input == "/stats":
+            usd = agent.cost_umicros / 1_000_000
+            flag = "~" if agent.cost_unknown else ""
+            print(
+                f"\n{YELLOW}{BOLD}session stats{RESET}\n"
+                f"  tokens:       {agent.tokens}\n"
+                f"  cost:         {flag}${usd:.6f}\n"
+                f"  api requests: {len(agent.calls)}"
+            )
             continue
         if user_input.startswith("/model"):
             parts = user_input.split(maxsplit=1)
