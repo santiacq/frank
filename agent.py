@@ -49,8 +49,10 @@ class Agent:
             debug_dump("tools sent with every request", tools.SCHEMAS)
 
     def clear(self) -> None:
-        """Drop the conversation, keeping the system prompt and model."""
+        """Reset the session: conversation back to the system prompt, stats to zero."""
         self.messages = [self.messages[0]]
+        self.tokens = 0
+        self.calls = 0
 
     def run(self, user_input: str) -> None:
         """Run one full turn: from user input until the model stops calling tools."""

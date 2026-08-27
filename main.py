@@ -83,7 +83,7 @@ def main():
                 "/model <name> -- switch models\n"
                 "/stats -- session tokens and request count\n"
                 "/debug -- toggle raw request/response output\n"
-                "/clear -- wipe the conversation (keeps the model)\n"
+                "/clear -- reset the session (keeps the model)\n"
                 "/quit -- exit\n"
                 "anything else -- send to the model\n"
             )
