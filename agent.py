@@ -10,6 +10,7 @@ import json
 import os
 
 import tools
+from providers import to_assistant_message
 
 SYSTEM_PROMPT = f"""\
 You are Frank, a coding agent running in a terminal.
@@ -36,15 +37,13 @@ def debug_dump(label: str, data) -> None:
 
 class Agent:
     def __init__(self, client, model, confirm, debug=False):
-        self.client = client
+        self.provider = client  # a Provider (openrouter/llama) exposing .chat()
         self.model = model
         self.confirm = confirm  # callback: (tool_name, args) -> bool
         self.debug = debug
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.tokens = 0          # total tokens this session (exact ints)
-        self.cost_umicros = 0    # running cost in integer microdollars (1 USD = 1_000_000)
-        self.cost_unknown = False  # True if any call didn't report a cost
-        self.calls = []          # (total_tokens, cost_usd|None, model) per API call
+        self.calls = 0           # number of API calls this session
         if self.debug:
             # The tools payload is identical on every request, so show it once.
             debug_dump("tools sent with every request", tools.SCHEMAS)
@@ -57,7 +56,7 @@ class Agent:
             if self.debug:
                 debug_dump(f"request to {self.model}", self.messages)
 
-            result = self.client.chat.send(
+            result = self.provider.chat(
                 model=self.model,
                 messages=self.messages,
                 tools=tools.SCHEMAS,
@@ -66,33 +65,25 @@ class Agent:
             usage = result.usage
             if usage is not None:
                 self.tokens += usage.total_tokens
-                cost = usage.cost
-                self.calls.append((usage.total_tokens, cost, self.model))
-                if cost is None:
-                    self.cost_unknown = True
-                else:
-                    # Accumulate in integer microdollars so tiny floats
-                    # can't accumulate rounding drift.
-                    self.cost_umicros += round(cost * 1_000_000)
+            self.calls += 1
 
             if self.debug:
                 debug_dump("response", result)
 
-            message = result.choices[0].message
-            # The response message object is a valid input message, so it can go
-            # straight back into the history (needed so the model sees its own
-            # tool_calls next iteration).
+            message = to_assistant_message(result)  # ChatResponse -> assistant message dict
+            # It is a plain dict now, so it can go straight back into the history
+            # (needed so the model sees its own tool_calls next iteration).
             self.messages.append(message)
 
-            if message.content:
-                print(f"\n{message.content}\n")
+            if result.content:
+                print(f"\n{result.content}\n")
 
-            if not message.tool_calls:
+            if not result.tool_calls:
                 return
 
-            for call in message.tool_calls:
-                name = call.function.name
-                args = json.loads(call.function.arguments)
+            for call in result.tool_calls:
+                name = call.name
+                args = call.arguments
 
                 if self.confirm(name, args):
                     output = tools.run(name, args)

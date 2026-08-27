@@ -6,11 +6,13 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from openrouter import OpenRouter
 
 from agent import Agent
+from providers import DEFAULT_MODEL, make_provider
 
-DEFAULT_MODEL = "deepseek/deepseek-v4-flash-0731"
+DEFAULT_PROVIDER = "openrouter"
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_LLAMA_BASE_URL = "http://localhost:8080/v1"
 
 BOLD = "\033[1m"
 YELLOW = "\033[33m"
@@ -27,21 +29,38 @@ def confirm(name: str, args: dict) -> bool:
     return answer.strip().lower() in ("y", "yes")
 
 
+def build_provider(override: str | None):
+    """Build a provider from env, optionally overriding FRANK_PROVIDER."""
+    return make_provider(
+        provider=override or os.environ.get("FRANK_PROVIDER", DEFAULT_PROVIDER),
+        openrouter_api_key=os.environ.get("OPENROUTER_API_KEY"),
+        openrouter_base_url=os.environ.get("OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL),
+        llama_base_url=os.environ.get("LLAMA_CPP_BASE_URL", DEFAULT_LLAMA_BASE_URL),
+        llama_model=os.environ.get("LLAMA_CPP_MODEL"),
+        openrouter_model=os.environ.get("OPENROUTER_MODEL"),
+    )
+
+
 def main():
     load_dotenv()
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        sys.exit("OPENROUTER_API_KEY is not set. Copy .env.example to .env and add your key.")
 
     parser = argparse.ArgumentParser(description="Frank, a minimal coding agent.")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="Any OpenRouter model slug.")
+    parser.add_argument("--model", help="Override the provider's model.")
+    parser.add_argument("--provider", help="Override FRANK_PROVIDER (openrouter | llama).")
     parser.add_argument("--debug", action="store_true", help="Print raw model requests/responses.")
     cli_args = parser.parse_args()
 
-    client = OpenRouter(api_key=api_key)
-    agent = Agent(client, cli_args.model, confirm, debug=cli_args.debug)
+    provider = build_provider(cli_args.provider)
+    model = cli_args.model or provider.default_model or DEFAULT_MODEL
+    if not model:
+        sys.exit(f"no model set: pass --model or set the provider's model in .env")
 
-    print(f"Frank -- model: {agent.model} -- /model <slug> to switch, /debug to toggle, /stats to see session stats, /quit to exit")
+    agent = Agent(provider, model, confirm, debug=cli_args.debug)
+
+    print(
+        f"Frank -- model: {agent.model} -- {provider.name}"
+        f" -- /model to switch, /debug to toggle, /stats to see session stats, /quit to exit"
+    )
 
     while True:
         try:
@@ -59,13 +78,11 @@ def main():
             print(f"debug {'on' if agent.debug else 'off'}")
             continue
         if user_input == "/stats":
-            usd = agent.cost_umicros / 1_000_000
-            flag = "~" if agent.cost_unknown else ""
             print(
                 f"\n{YELLOW}{BOLD}session stats{RESET}\n"
+                f"  provider:     {provider.name}\n"
                 f"  tokens:       {agent.tokens}\n"
-                f"  cost:         {flag}${usd:.6f}\n"
-                f"  api requests: {len(agent.calls)}"
+                f"  api requests: {agent.calls}"
             )
             continue
         if user_input.startswith("/model"):
