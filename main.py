@@ -64,8 +64,7 @@ def main():
     agent = Agent(provider, model, confirm, debug=cli_args.debug)
 
     print(
-        f"Frank -- model: {agent.model} -- {provider.name}"
-        f" -- /model to switch, /debug to toggle, /stats to see session stats, /quit to exit"
+        f"Frank -- model: {agent.model} -- {provider.name} -- /help to see commands"
     )
 
     while True:
@@ -79,6 +78,20 @@ def main():
             continue
         if user_input in ("/quit", "/exit"):
             break
+        if user_input == "/help":
+            print(
+                "\n/plain text -- send to the model\n"
+                "/model <name> -- switch models\n"
+                "/stats -- session tokens and request count\n"
+                "/debug -- toggle raw request/response output\n"
+                "/clear -- wipe the conversation (keeps the model)\n"
+                "/quit -- exit\n"
+            )
+            continue
+        if user_input == "/clear":
+            agent.clear()
+            print("conversation cleared")
+            continue
         if user_input == "/debug":
             agent.debug = not agent.debug
             print(f"debug {'on' if agent.debug else 'off'}")

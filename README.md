@@ -65,9 +65,11 @@ uv run python main.py --provider llama --model model.gguf
 
 | Command | Description |
 | --- | --- |
+| `/help` | List commands |
 | `/model <name>` | Switch models (OpenRouter slug or local model name) |
 | `/stats` | Show provider, session tokens, and API request count |
 | `/debug` | Toggle debug output |
+| `/clear` | Wipe the conversation |
 | `/quit` | Exit |
 
 Type anything else to send it to the model. Every tool call asks for

@@ -48,6 +48,10 @@ class Agent:
             # The tools payload is identical on every request, so show it once.
             debug_dump("tools sent with every request", tools.SCHEMAS)
 
+    def clear(self) -> None:
+        """Drop the conversation, keeping the system prompt and model."""
+        self.messages = [self.messages[0]]
+
     def run(self, user_input: str) -> None:
         """Run one full turn: from user input until the model stops calling tools."""
         self.messages.append({"role": "user", "content": user_input})
