@@ -80,12 +80,12 @@ def main():
             break
         if user_input == "/help":
             print(
-                "\n/plain text -- send to the model\n"
                 "/model <name> -- switch models\n"
                 "/stats -- session tokens and request count\n"
                 "/debug -- toggle raw request/response output\n"
                 "/clear -- wipe the conversation (keeps the model)\n"
                 "/quit -- exit\n"
+                "anything else -- send to the model\n"
             )
             continue
         if user_input == "/clear":
