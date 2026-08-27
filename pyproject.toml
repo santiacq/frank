@@ -3,6 +3,8 @@ name = "frank"
 version = "0.1.0"
 description = "Frank: a minimal from-scratch coding agent harness on OpenRouter"
 readme = "README.md"
+license = "MIT"
+authors = [{ name = "Santiago Acquarone", email = "santiacquarone@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "openai>=1.0.0",

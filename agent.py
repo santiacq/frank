@@ -36,8 +36,8 @@ def debug_dump(label: str, data) -> None:
 
 
 class Agent:
-    def __init__(self, client, model, confirm, debug=False):
-        self.provider = client  # a Provider (openrouter/llama) exposing .chat()
+    def __init__(self, provider, model, confirm, debug=False):
+        self.provider = provider  # an OpenRouter/llama provider exposing .chat()
         self.model = model
         self.confirm = confirm  # callback: (tool_name, args) -> bool
         self.debug = debug

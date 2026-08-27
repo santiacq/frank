@@ -88,3 +88,16 @@ The agent sends the whole conversation to the model. If it replies with tool
 calls, they're confirmed and executed, the results are appended, and the loop
 repeats. When the model replies with plain text, the turn ends and control
 returns to the REPL.
+
+## Extending
+
+- **Add a tool** — in [`tools.py`](tools.py), define a Python function and a
+  matching entry in `TOOLS` with its JSON schema. The schema list is derived
+  from that dict, so that's the whole change.
+- **Add a backend** — anything that speaks the OpenAI-compatible
+  `/chat/completions` endpoint works by passing `name` + `base_url` to
+  `make_provider` in [`providers.py`](providers.py).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

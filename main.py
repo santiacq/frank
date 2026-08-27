@@ -8,7 +8,7 @@ import sys
 from dotenv import load_dotenv
 
 from agent import Agent
-from providers import DEFAULT_MODEL, make_provider
+from providers import make_provider
 
 DEFAULT_PROVIDER = "openrouter"
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -30,14 +30,20 @@ def confirm(name: str, args: dict) -> bool:
 
 
 def build_provider(override: str | None):
-    """Build a provider from env, optionally overriding FRANK_PROVIDER."""
+    """Resolve config from the environment and build the provider."""
+    name = override or os.environ.get("FRANK_PROVIDER", DEFAULT_PROVIDER)
+    if name == "llama":
+        return make_provider(
+            name=name,
+            base_url=os.environ.get("LLAMA_CPP_BASE_URL", DEFAULT_LLAMA_BASE_URL),
+            api_key="sk-no-key",  # local servers don't authenticate
+            model=os.environ.get("LLAMA_CPP_MODEL"),
+        )
     return make_provider(
-        provider=override or os.environ.get("FRANK_PROVIDER", DEFAULT_PROVIDER),
-        openrouter_api_key=os.environ.get("OPENROUTER_API_KEY"),
-        openrouter_base_url=os.environ.get("OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL),
-        llama_base_url=os.environ.get("LLAMA_CPP_BASE_URL", DEFAULT_LLAMA_BASE_URL),
-        llama_model=os.environ.get("LLAMA_CPP_MODEL"),
-        openrouter_model=os.environ.get("OPENROUTER_MODEL"),
+        name=name,
+        base_url=os.environ.get("OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL),
+        api_key=os.environ.get("OPENROUTER_API_KEY"),
+        model=os.environ.get("OPENROUTER_MODEL"),
     )
 
 
@@ -51,9 +57,9 @@ def main():
     cli_args = parser.parse_args()
 
     provider = build_provider(cli_args.provider)
-    model = cli_args.model or provider.default_model or DEFAULT_MODEL
+    model = cli_args.model or provider.default_model
     if not model:
-        sys.exit(f"no model set: pass --model or set the provider's model in .env")
+        sys.exit("no model set: pass --model or set the provider's model in .env")
 
     agent = Agent(provider, model, confirm, debug=cli_args.debug)
 

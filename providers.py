@@ -11,20 +11,19 @@ endpoint:
   * OpenRouter  -> https://openrouter.ai/api/v1
   * llama.cpp   -> http://localhost:8080/v1
 
-Adding a new backend means adding one more provider class; the agent loop never
-changes.
+Adding a new backend means adding one more provider instance; the agent loop
+never changes.
 """
 
 import json
 from dataclasses import dataclass
-from typing import List, Optional
 
 from openai import OpenAI
 
 # The messages and tools are shared plain dicts/lists (OpenAI format), produced
 # by tools.py. Keeping them untyped here avoids coupling this module to tools.
-MESSAGES = List[dict]
-TOOLS = List[dict]
+MESSAGES = list[dict]
+TOOLS = list[dict]
 
 # Fallback model for OpenRouter when none is configured or passed on the CLI.
 DEFAULT_MODEL = "deepseek/deepseek-v4-flash-0731"
@@ -47,29 +46,21 @@ class Usage:
 @dataclass
 class ChatResponse:
     content: str
-    tool_calls: List[ToolCall]
-    usage: Usage
+    tool_calls: list[ToolCall]
+    usage: Usage | None
 
 
 class Provider:
-    """Interface the agent loop depends on."""
+    """One OpenAI-compatible endpoint the agent loop can talk to.
 
-    name: str = "provider"
-
-    def chat(self, model: str, messages: MESSAGES, tools: TOOLS) -> ChatResponse:
-        raise NotImplementedError  # pragma: no cover
-
-
-class _OpenAICompatibleProvider(Provider):
-    """Base class backed by the ``openai`` library.
-
-    Sends the request and normalises the OpenAI-style completion into a
+    Thin wrapper around the ``openai`` client that normalises completions into
     ``ChatResponse``.
     """
 
-    def __init__(self, base_url: str, api_key: str, model: Optional[str] = None):
+    def __init__(self, base_url: str, api_key: str, model: str | None = None):
         # ``api_key="sk-no-key"`` keeps the client happy for local servers that
         # don't authenticate.
+        self.name = base_url  # used in /stats; a URL tells you which backend
         self.client = OpenAI(base_url=base_url, api_key=api_key)
         self.default_model = model
 
@@ -79,7 +70,6 @@ class _OpenAICompatibleProvider(Provider):
             kwargs["tools"] = tools
         response = self.client.chat.completions.create(**kwargs)
         message = response.choices[0].message
-        usage = response.usage or Usage()
         return ChatResponse(
             content=message.content or "",
             tool_calls=[
@@ -90,22 +80,8 @@ class _OpenAICompatibleProvider(Provider):
                 )
                 for tc in (message.tool_calls or [])
             ],
-            usage=Usage(
-                prompt_tokens=usage.prompt_tokens or 0,
-                completion_tokens=usage.completion_tokens or 0,
-                total_tokens=usage.total_tokens or 0,
-            ),
+            usage=_usage(response.usage),
         )
-
-
-class OpenRouterProvider(_OpenAICompatibleProvider):
-    name = "openrouter"
-
-
-class LlamaCppProvider(_OpenAICompatibleProvider):
-    """A local llama.cpp server (``llama-server``) speaking OpenAI compat."""
-
-    name = "llama"
 
 
 def to_assistant_message(response: ChatResponse) -> dict:
@@ -124,7 +100,18 @@ def to_assistant_message(response: ChatResponse) -> dict:
     return message
 
 
-def _loads(raw: Optional[str]) -> dict:
+def _usage(usage) -> Usage | None:
+    """Normalise an openai CompletionUsage into our own Usage (or None)."""
+    if usage is None:
+        return None
+    return Usage(
+        prompt_tokens=usage.prompt_tokens or 0,
+        completion_tokens=usage.completion_tokens or 0,
+        total_tokens=usage.total_tokens or 0,
+    )
+
+
+def _loads(raw: str | None) -> dict:
     """Parse the model's function-arguments JSON string (tolerating None)."""
     try:
         return json.loads(raw) if raw else {}
@@ -138,31 +125,20 @@ def _dumps(arguments: dict) -> str:
 
 
 def make_provider(
-    provider: str,
-    openrouter_api_key: Optional[str],
-    openrouter_base_url: str,
-    llama_base_url: str,
-    llama_model: Optional[str],
-    openrouter_model: str = "",
+    name: str,
+    base_url: str,
+    api_key: str | None,
+    model: str | None = None,
 ) -> Provider:
-    """Build a provider from config values read from the environment."""
-    provider = (provider or "openrouter").strip().lower()
+    """Build a provider for one OpenAI-compatible endpoint.
 
-    if provider == "openrouter":
-        if not openrouter_api_key:
-            raise SystemExit(
-                "FRANK_PROVIDER=openrouter but OPENROUTER_API_KEY is not set. "
-                "Add it to .env, or set FRANK_PROVIDER=llama for a local model."
-            )
-        return OpenRouterProvider(
-            base_url=openrouter_base_url,
-            api_key=openrouter_api_key,
-            model=openrouter_model or DEFAULT_MODEL,
+    ``name`` is only checked to route error messages for the two backends we
+    know about -- the object returned is the same either way.
+    """
+    if not api_key and name != "llama":
+        raise SystemExit(
+            f"FRANK_PROVIDER={name} but no API key was found. "
+            "Add it to .env, or set FRANK_PROVIDER=llama for a local model."
         )
-
-    if provider == "llama":
-        return LlamaCppProvider(
-            base_url=llama_base_url, api_key="sk-no-key", model=llama_model
-        )
-
-    raise SystemExit(f"unknown FRANK_PROVIDER: {provider!r}")
+    default_model = model or (DEFAULT_MODEL if name == "openrouter" else None)
+    return Provider(base_url=base_url, api_key=api_key or "sk-no-key", model=default_model)
